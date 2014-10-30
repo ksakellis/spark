@@ -224,13 +224,9 @@ class HadoopRDD[K, V](
       val value: V = reader.createValue()
 
       val readMethod = DataReadMethod.Hadoop
-      val inputMetrics = if (context.taskMetrics().inputMetrics.isDefined &&
-          context.taskMetrics().inputMetrics.get.readMethod.equals(readMethod)) {
-        logDebug("Accumulating additional input metrics for " + split.inputSplit)
-        context.taskMetrics().inputMetrics.get
-      } else {
-        new InputMetrics(readMethod)
-      }
+      val inputMetrics = context.taskMetrics().inputMetrics
+          .filter { _.readMethod == readMethod }
+          .getOrElse(new InputMetrics(readMethod))
 
       // Find a function that will return the FileSystem bytes read by this thread.
       val bytesReadCallback = if (split.inputSplit.value.isInstanceOf[FileSplit]) {
