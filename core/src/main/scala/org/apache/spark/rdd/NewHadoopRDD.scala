@@ -119,7 +119,15 @@ class NewHadoopRDD[K, V](
         split.serializableHadoopSplit.value, hadoopAttemptContext)
       reader.initialize(split.serializableHadoopSplit.value, hadoopAttemptContext)
 
-      val inputMetrics = new InputMetrics(DataReadMethod.Hadoop)
+      val readMethod = DataReadMethod.Hadoop
+      val inputMetrics = if (context.taskMetrics().inputMetrics.isDefined &&
+          context.taskMetrics().inputMetrics.get.readMethod.equals(readMethod)) {
+        logDebug("Accumulating additional input metrics for " + split.serializableHadoopSplit)
+        context.taskMetrics().inputMetrics.get
+      } else {
+        new InputMetrics(readMethod)
+      }
+
       // Find a function that will return the FileSystem bytes read by this thread.
       val bytesReadCallback = if (split.serializableHadoopSplit.value.isInstanceOf[FileSplit]) {
         SparkHadoopUtil.get.getFSBytesReadOnThreadCallback(
@@ -156,7 +164,7 @@ class NewHadoopRDD[K, V](
             && bytesReadCallback.isDefined) {
           recordsSinceMetricsUpdate = 0
           val bytesReadFn = bytesReadCallback.get
-          inputMetrics.bytesRead = bytesReadFn()
+          inputMetrics.bytesRead += bytesReadFn()
         } else {
           recordsSinceMetricsUpdate += 1
         }
@@ -171,12 +179,12 @@ class NewHadoopRDD[K, V](
           // Update metrics with final amount
           if (bytesReadCallback.isDefined) {
             val bytesReadFn = bytesReadCallback.get
-            inputMetrics.bytesRead = bytesReadFn()
+            inputMetrics.bytesRead += bytesReadFn()
           } else if (split.serializableHadoopSplit.value.isInstanceOf[FileSplit]) {
             // If we can't get the bytes read from the FS stats, fall back to the split size,
             // which may be inaccurate.
             try {
-              inputMetrics.bytesRead = split.serializableHadoopSplit.value.getLength
+              inputMetrics.bytesRead += split.serializableHadoopSplit.value.getLength
               context.taskMetrics.inputMetrics = Some(inputMetrics)
             } catch {
               case e: java.io.IOException =>

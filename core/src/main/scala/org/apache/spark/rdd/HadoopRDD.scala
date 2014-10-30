@@ -223,7 +223,15 @@ class HadoopRDD[K, V](
       val key: K = reader.createKey()
       val value: V = reader.createValue()
 
-      val inputMetrics = new InputMetrics(DataReadMethod.Hadoop)
+      val readMethod = DataReadMethod.Hadoop
+      val inputMetrics = if (context.taskMetrics().inputMetrics.isDefined &&
+          context.taskMetrics().inputMetrics.get.readMethod.equals(readMethod)) {
+        logDebug("Accumulating additional input metrics for " + split.inputSplit)
+        context.taskMetrics().inputMetrics.get
+      } else {
+        new InputMetrics(readMethod)
+      }
+
       // Find a function that will return the FileSystem bytes read by this thread.
       val bytesReadCallback = if (split.inputSplit.value.isInstanceOf[FileSplit]) {
         SparkHadoopUtil.get.getFSBytesReadOnThreadCallback(
@@ -249,7 +257,7 @@ class HadoopRDD[K, V](
             && bytesReadCallback.isDefined) {
           recordsSinceMetricsUpdate = 0
           val bytesReadFn = bytesReadCallback.get
-          inputMetrics.bytesRead = bytesReadFn()
+          inputMetrics.bytesRead += bytesReadFn()
         } else {
           recordsSinceMetricsUpdate += 1
         }
@@ -261,12 +269,12 @@ class HadoopRDD[K, V](
           reader.close()
           if (bytesReadCallback.isDefined) {
             val bytesReadFn = bytesReadCallback.get
-            inputMetrics.bytesRead = bytesReadFn()
+            inputMetrics.bytesRead += bytesReadFn()
           } else if (split.inputSplit.value.isInstanceOf[FileSplit]) {
             // If we can't get the bytes read from the FS stats, fall back to the split size,
             // which may be inaccurate.
             try {
-              inputMetrics.bytesRead = split.inputSplit.value.getLength
+              inputMetrics.bytesRead += split.inputSplit.value.getLength
               context.taskMetrics.inputMetrics = Some(inputMetrics)
             } catch {
               case e: java.io.IOException =>
