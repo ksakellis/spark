@@ -17,8 +17,11 @@
 
 package org.apache.spark.metrics
 
+import org.apache.hadoop.io.{Text, LongWritable}
+import org.apache.hadoop.mapreduce.lib.input.{TextInputFormat => NewTextInputFormat}
 import org.scalatest.FunSuite
 
+import org.apache.spark.util.Utils
 import org.apache.spark.SharedSparkContext
 import org.apache.spark.scheduler.{SparkListenerTaskEnd, SparkListener}
 
@@ -27,27 +30,89 @@ import scala.collection.mutable.ArrayBuffer
 import java.io.{FileWriter, PrintWriter, File}
 
 class InputMetricsSuite extends FunSuite with SharedSparkContext {
-  test("input metrics when reading text file") {
-    val file = new File(getClass.getSimpleName + ".txt")
-    val pw = new PrintWriter(new FileWriter(file))
+
+  @transient var tmpDir: File = _
+  @transient var tmpFile: File = _
+  @transient var tmpFilePath: String = _
+
+  override def beforeAll() {
+    super.beforeAll()
+
+    tmpDir = Utils.createTempDir()
+    val testTempDir = new File(tmpDir, "test")
+    testTempDir.mkdir()
+
+    tmpFile = new File(testTempDir, getClass.getSimpleName + ".txt")
+    val pw = new PrintWriter(new FileWriter(tmpFile))
     pw.println("some stuff")
     pw.println("some other stuff")
     pw.println("yet more stuff")
     pw.println("too much stuff")
     pw.close()
-    file.deleteOnExit()
 
+    // Path to tmpFile
+    tmpFilePath = "file://" + tmpFile.getAbsolutePath
+  }
+
+  override def afterAll() {
+    super.afterAll()
+    Utils.deleteRecursively(tmpDir)
+  }
+
+  test("input metrics for old hadoop with coalesce") {
+    val bytesRead = runAndReturnBytesRead() {
+      sc.textFile(tmpFilePath, 4).coalesce(2).count()
+    }
+    assert(bytesRead == tmpFile.length())
+  }
+
+  test("input metrics with cache and coalesce") {
+
+    // prime the cache manager
+    val rdd = sc.textFile(tmpFilePath, 4)
+                .cache()
+    rdd.collect()
+
+    val bytesRead = runAndReturnBytesRead() {
+      rdd.count()
+    }
+
+    val bytesRead2 = runAndReturnBytesRead() {
+      rdd.coalesce(4).count()
+    }
+
+    // for count and coelesce, the same bytes should be read.
+    assert(bytesRead == bytesRead2)
+  }
+
+  test("input metrics for new Hadoop API with coalesce") {
+    val bytesRead = runAndReturnBytesRead() {
+      sc.newAPIHadoopFile(tmpFilePath, classOf[NewTextInputFormat], classOf[LongWritable],
+        classOf[Text]).coalesce(5).count()
+    }
+    assert(bytesRead == tmpFile.length())
+  }
+
+  test("input metrics when reading text file") {
+    val bytesRead = runAndReturnBytesRead() {
+      sc.textFile(tmpFilePath, 2).count()
+    }
+    assert(bytesRead == tmpFile.length())
+  }
+
+  private def runAndReturnBytesRead()(job : => Unit): Long = {
     val taskBytesRead = new ArrayBuffer[Long]()
     sc.addSparkListener(new SparkListener() {
       override def onTaskEnd(taskEnd: SparkListenerTaskEnd) {
         taskBytesRead += taskEnd.taskMetrics.inputMetrics.get.bytesRead
       }
     })
-    sc.textFile("file://" + file.getAbsolutePath, 2).count()
 
-    // Wait for task end events to come in
+    // run test
+    job
+
     sc.listenerBus.waitUntilEmpty(500)
-    assert(taskBytesRead.length == 2)
-    assert(taskBytesRead.sum == file.length())
+    taskBytesRead.sum
   }
+
 }
