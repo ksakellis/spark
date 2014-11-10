@@ -76,7 +76,7 @@ import org.apache.spark.util.random.{BernoulliSampler, PoissonSampler, Bernoulli
  */
 abstract class RDD[T: ClassTag](
     @transient private var sc: SparkContext,
-    @transient private var deps: Seq[Dependency[_]]
+    @transient var deps: Seq[Dependency[_]]
   ) extends Serializable with Logging {
 
   /** Construct an RDD with just a one-to-one dependency on one parent */
@@ -778,7 +778,8 @@ abstract class RDD[T: ClassTag](
    */
   def collect(): Array[T] = {
     val results = sc.runJob(this, (iter: Iterator[T]) => iter.toArray)
-    Array.concat(results: _*)
+    Array()
+   // Array.concat(results: _*)
   }
 
   /**

@@ -31,3 +31,6 @@ case object JobSucceeded extends JobResult
 
 @DeveloperApi
 private[spark] case class JobFailed(exception: Exception) extends JobResult
+
+@DeveloperApi
+private[spark] case class JobPaused(stageId : Int) extends JobResult

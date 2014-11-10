@@ -1184,10 +1184,52 @@ class SparkContext(config: SparkConf) extends SparkStatusAPI with Logging {
     }
     val callSite = getCallSite
     val cleanedFunc = clean(func)
-    logInfo("Starting job: " + callSite.shortForm)
-    dagScheduler.runJob(rdd, cleanedFunc, partitions, callSite, allowLocal,
-      resultHandler, localProperties.get)
-    rdd.doCheckpoint()
+
+    val explainOnly = executionDisabled.getOrElse(conf.getBoolean("spark.explainOnly", false))
+    val showPlan = showExplainPlan.getOrElse(conf.getBoolean("spark.printPlan", false))
+
+    if (explainOnly || showPlan) {
+      logInfo("Starting job: " + callSite.shortForm)
+      val execPlan = new ExecutionPlan(this)
+      execPlan.explainJob(rdd, cleanedFunc, partitions, callSite, resultHandler)
+    }
+
+    if (!explainOnly) {
+      logInfo("Starting job: " + callSite.shortForm)
+      dagScheduler.paused = false
+      dagScheduler.runJob(rdd, cleanedFunc, partitions, callSite, allowLocal,
+        resultHandler, localProperties.get)
+      rdd.doCheckpoint()
+    }
+  }
+
+  var executionDisabled : Option[Boolean] = None
+  var showExplainPlan : Option[Boolean] = None
+
+  def disableExecution(): Unit = {
+    executionDisabled = Some(true)
+  }
+
+  def enableExecution(): Unit = {
+    executionDisabled = Some(false)
+  }
+  
+  def explainOff(): Unit = {
+    showExplainPlan = Some(false)
+  }
+  
+  def explainOn(): Unit = {
+    showExplainPlan = Some(true)
+  }
+  
+  def pauseExecution(stageId : Int) : Unit = {
+    enableExecution()
+    dagScheduler.pauseAtStageId = Some(stageId)
+  }
+
+  def resumeExecution(): Unit = {
+    enableExecution()
+    dagScheduler.pauseAtStageId = None
   }
 
   /**

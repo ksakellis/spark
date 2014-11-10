@@ -79,6 +79,8 @@ class DAGScheduler(
       sc.env)
   }
 
+  var pauseAtStageId : Option[Int] = None
+
   def this(sc: SparkContext) = this(sc, sc.taskScheduler)
 
   private[scheduler] val nextJobId = new AtomicInteger(0)
@@ -517,10 +519,14 @@ class DAGScheduler(
         logInfo("Job %d finished: %s, took %f s".format
           (waiter.jobId, callSite.shortForm, (System.nanoTime - start) / 1e9))
       }
-      case JobFailed(exception: Exception) =>
+      case JobFailed(exception: Exception) => {
         logInfo("Job %d failed: %s, took %f s".format
           (waiter.jobId, callSite.shortForm, (System.nanoTime - start) / 1e9))
         throw exception
+      }
+      case JobPaused(stageId : Int) => {
+        logInfo("Job %d paused at stage: %d".format(waiter.jobId, stageId))
+      }
     }
   }
 
@@ -762,6 +768,9 @@ class DAGScheduler(
         submitStage(finalStage)
       }
     }
+    if (paused) {
+      return
+    }
     submitWaitingStages()
   }
 
@@ -776,9 +785,15 @@ class DAGScheduler(
         if (missing == Nil) {
           logInfo("Submitting " + stage + " (" + stage.rdd + "), which has no missing parents")
           submitMissingTasks(stage, jobId.get)
+          if (paused) {
+            return
+          }
         } else {
           for (parent <- missing) {
             submitStage(parent)
+            if (paused) {
+              return
+            }
           }
           waitingStages += stage
         }
@@ -788,8 +803,19 @@ class DAGScheduler(
     }
   }
 
+  var paused : Boolean = false
+
   /** Called when stage's parents are available and we can now do its task. */
   private def submitMissingTasks(stage: Stage, jobId: Int) {
+
+    if (pauseAtStageId.isDefined) {
+      if (pauseAtStageId.get == stage.id) {
+        eventProcessActor ! JobPauseRequested(jobId, pauseAtStageId.get)
+        paused = true
+        return
+      }
+    }
+
     logDebug("submitMissingTasks(" + stage + ")")
     // Get our pending tasks and remember them in our pendingTasks entry
     stage.pendingTasks.clear()
@@ -1179,6 +1205,11 @@ class DAGScheduler(
     submitWaitingStages()
   }
 
+  private[scheduler] def handleJobPaused(jobId : Int, stageId : Int): Unit = {
+    val job = jobIdToActiveJob(jobId)
+    job.listener.jobPaused(stageId)
+  }
+
   /**
    * Aborts all jobs depending on a particular Stage. This is called in response to a task set
    * being canceled by the TaskScheduler. Use taskSetFailed() to inject this event from outside.
@@ -1380,6 +1411,9 @@ private[scheduler] class DAGSchedulerEventProcessActor(dagScheduler: DAGSchedule
     case JobSubmitted(jobId, rdd, func, partitions, allowLocal, callSite, listener, properties) =>
       dagScheduler.handleJobSubmitted(jobId, rdd, func, partitions, allowLocal, callSite,
         listener, properties)
+
+    case JobPauseRequested(jobId, stageId) =>
+      dagScheduler.handleJobPaused(jobId, stageId)
 
     case StageCancelled(stageId) =>
       dagScheduler.handleStageCancellation(stageId)

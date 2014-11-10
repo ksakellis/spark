@@ -63,6 +63,10 @@ private[spark] class ApproximateActionListener[T, U, R](
     }
   }
 
+  override def jobPaused(stageId : Int) : Unit = {
+    this.notifyAll()
+  }
+
   /**
    * Waits for up to timeout milliseconds since the listener was created and then returns a
    * PartialResult with the result so far. This may be complete if the whole job is done.

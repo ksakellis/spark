@@ -141,6 +141,7 @@ class DAGSchedulerSuite extends TestKit(ActorSystem("DAGSchedulerSuite")) with F
   val jobListener = new JobListener() {
     override def taskSucceeded(index: Int, result: Any) = results.put(index, result)
     override def jobFailed(exception: Exception) = { failure = exception }
+    override def jobPaused(stageId : Int) : Unit = {}
   }
 
   before {
@@ -562,6 +563,7 @@ class DAGSchedulerSuite extends TestKit(ActorSystem("DAGSchedulerSuite")) with F
       var failureMessage: String = _
       override def taskSucceeded(index: Int, result: Any) {}
       override def jobFailed(exception: Exception) = { failureMessage = exception.getMessage }
+      override def jobPaused(stageId : Int) : Unit = {}
     }
     val listener1 = new FailureRecordingJobListener()
     val listener2 = new FailureRecordingJobListener()

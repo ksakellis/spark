@@ -34,6 +34,9 @@ private[spark] class JobWaiter[T](
   @volatile
   private var _jobFinished = totalTasks == 0
 
+  @volatile
+  private var _jobPaused = false
+
   def jobFinished = _jobFinished
 
   // If the job is finished, this will be its result. In the case of 0 task jobs (e.g. zero
@@ -68,8 +71,14 @@ private[spark] class JobWaiter[T](
     this.notifyAll()
   }
 
+  override def jobPaused(stageId : Int): Unit = synchronized {
+    _jobPaused = true
+    jobResult = JobPaused(stageId)
+    this.notifyAll()
+  }
+
   def awaitResult(): JobResult = synchronized {
-    while (!_jobFinished) {
+    while (!_jobFinished && !_jobPaused) {
       this.wait()
     }
     return jobResult
