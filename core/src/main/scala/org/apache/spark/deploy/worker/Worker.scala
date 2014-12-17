@@ -349,8 +349,8 @@ private[spark] class Worker(
           appDirectories(appId) = appLocalDirs
 
           val manager = new ExecutorRunner(appId, execId, appDesc, cores_, memory_,
-            self, workerId, host, sparkHome, executorDir, akkaUrl, conf, appLocalDirs,
-            ExecutorState.LOADING)
+            self, workerId, host, webUiPort, sparkHome, executorDir, akkaUrl, conf,
+            appLocalDirs, ExecutorState.LOADING)
           executors(appId + "/" + execId) = manager
           manager.start()
           coresUsed += cores_
