@@ -22,7 +22,7 @@ import java.util.Properties
 import org.apache.spark.scheduler.cluster.ExecutorInfo
 import org.apache.spark.shuffle.MetadataFetchFailedException
 
-import scala.collection.Map
+import scala.collection.{immutable, Map}
 
 import org.json4s.jackson.JsonMethods._
 import org.scalatest.FunSuite
@@ -278,6 +278,16 @@ class JsonProtocolSuite extends FunSuite {
       .removeField({ _._1 == "Completion Time"})
     val expectedJobEnd = SparkListenerJobEnd(11, -1, JobSucceeded)
     assertEquals(expectedJobEnd, JsonProtocol.jobEndFromJson(oldEndEvent))
+  }
+
+  test("ExecutorInfo backward compatibility") {
+    // Prior to Spark 1.3.0, ExecutorInfo did not have a "Log Urls" property
+    val executorInfo =
+      new ExecutorInfo("hostname", totalCores = 10, immutable.Map("stderr" -> "somePath"))
+    val oldExecutorInfoJson = JsonProtocol.executorInfoToJson(executorInfo)
+      .removeField{ _._1 == "Log Urls" }
+    val expectedExecutorInfo = new ExecutorInfo("hostname", totalCores = 10, immutable.Map.empty)
+    assertEquals(expectedExecutorInfo, JsonProtocol.executorInfoFromJson(oldExecutorInfoJson))
   }
 
   /** -------------------------- *

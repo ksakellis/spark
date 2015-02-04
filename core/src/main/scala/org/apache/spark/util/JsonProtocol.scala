@@ -22,7 +22,7 @@ import java.util.{Properties, UUID}
 import org.apache.spark.scheduler.cluster.ExecutorInfo
 
 import scala.collection.JavaConverters._
-import scala.collection.Map
+import scala.collection.{immutable, Map}
 
 import org.json4s.DefaultFormats
 import org.json4s.JsonDSL._
@@ -793,7 +793,7 @@ private[spark] object JsonProtocol {
   def executorInfoFromJson(json: JValue): ExecutorInfo = {
     val executorHost = (json \ "Host").extract[String]
     val totalCores = (json \ "Total Cores").extract[Int]
-    val logUrls = mapFromJson(json \ "Log Urls").toMap
+    val logUrls = Utils.jsonOption(json \ "Log Urls").map(mapFromJson).getOrElse(Map.empty)
     new ExecutorInfo(executorHost, totalCores, logUrls)
   }
 
@@ -801,7 +801,7 @@ private[spark] object JsonProtocol {
    * Util JSON deserialization methods |
    * --------------------------------- */
 
-  def mapFromJson(json: JValue): Map[String, String] = {
+  def mapFromJson(json: JValue): immutable.Map[String, String] = {
     val jsonFields = json.asInstanceOf[JObject].obj
     jsonFields.map { case JField(k, JString(v)) => (k, v) }.toMap
   }
