@@ -225,7 +225,7 @@ private class SaveExecutorInfo extends SparkListener {
 private object YarnClusterDriver extends Logging with Matchers {
 
   val WAIT_TIMEOUT_MILLIS = 10000
-  val listener = new SaveExecutorInfo
+  var listener: SaveExecutorInfo = null
 
   def main(args: Array[String]) = {
     if (args.length != 2) {
@@ -238,6 +238,7 @@ private object YarnClusterDriver extends Logging with Matchers {
       System.exit(1)
     }
 
+    listener = new SaveExecutorInfo
     val sc = new SparkContext(new SparkConf().setMaster(args(0))
       .setAppName("yarn \"test app\" 'with quotes' and \\back\\slashes and $dollarSigns"))
     sc.addSparkListener(listener)
@@ -251,6 +252,7 @@ private object YarnClusterDriver extends Logging with Matchers {
     } finally {
       sc.stop()
       Files.write(result, status, Charsets.UTF_8)
+      listener = null
     }
   }
 
