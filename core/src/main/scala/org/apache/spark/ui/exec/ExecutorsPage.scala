@@ -26,7 +26,7 @@ import org.apache.spark.ui.{ToolTips, UIUtils, WebUIPage}
 import org.apache.spark.util.Utils
 
 /** Summary information about an executor to display in the UI. */
-private[ui] case class ExecutorSummaryInfo(
+private case class ExecutorSummaryInfo(
     id: String,
     hostPort: String,
     rddBlocks: Int,
@@ -41,7 +41,7 @@ private[ui] case class ExecutorSummaryInfo(
     totalShuffleRead: Long,
     totalShuffleWrite: Long,
     maxMemory: Long,
-    executorLogs : Map[String, String])
+    executorLogs: Map[String, String])
 
 private[ui] class ExecutorsPage(
     parent: ExecutorsTab,
@@ -144,13 +144,15 @@ private[ui] class ExecutorsPage(
       {
         if (logsExist) {
           <td>
-            {info.executorLogs.map { entry => {
-            <div>
-              <a href={s"${entry._2}"}>
-                {entry._1}
-              </a>
-            </div>}
-            }}
+            {
+              info.executorLogs.map { case (logName, logUrl) =>
+                <div>
+                  <a href={logUrl}>
+                    {logName}
+                  </a>
+                </div>
+              }
+            }
           </td>
         }
       }

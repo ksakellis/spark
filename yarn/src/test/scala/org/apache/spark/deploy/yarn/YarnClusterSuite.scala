@@ -29,10 +29,10 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration
 import org.apache.hadoop.yarn.server.MiniYARNCluster
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 
+import org.apache.spark.{Logging, SparkConf, SparkContext, SparkException}
 import org.apache.spark.scheduler.cluster.ExecutorInfo
 import org.apache.spark.scheduler.{SparkListener, SparkListenerExecutorAdded}
 import org.apache.spark.util.Utils
-import org.apache.spark.{Logging, SparkConf, SparkContext, SparkException}
 
 class YarnClusterSuite extends FunSuite with BeforeAndAfterAll with Matchers with Logging {
 
@@ -146,9 +146,9 @@ class YarnClusterSuite extends FunSuite with BeforeAndAfterAll with Matchers wit
     checkResult(result)
 
     // verify log urls are present
-    YarnClusterDriver.listener.addedExecutorInfos.foreach(e => {
-      assert(e._2.logUrlMap.nonEmpty)
-    })
+    YarnClusterDriver.listener.addedExecutorInfos.values.foreach { info =>
+      assert(info.logUrlMap.nonEmpty)
+    }
   }
 
   test("run Spark in yarn-cluster mode") {
@@ -164,9 +164,9 @@ class YarnClusterSuite extends FunSuite with BeforeAndAfterAll with Matchers wit
     checkResult(result)
 
     // verify log urls are present.
-    YarnClusterDriver.listener.addedExecutorInfos.foreach { e => {
-      assert(e._2.logUrlMap.nonEmpty)
-    }}
+    YarnClusterDriver.listener.addedExecutorInfos.values.foreach { info =>
+      assert(info.logUrlMap.nonEmpty)
+    }
   }
 
   test("run Spark in yarn-cluster mode unsuccessfully") {
@@ -237,7 +237,6 @@ private object YarnClusterDriver extends Logging with Matchers {
         """.stripMargin)
       System.exit(1)
     }
-
 
     val sc = new SparkContext(new SparkConf().setMaster(args(0))
       .setAppName("yarn \"test app\" 'with quotes' and \\back\\slashes and $dollarSigns"))
