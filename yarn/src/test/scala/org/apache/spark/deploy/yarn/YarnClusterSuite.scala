@@ -252,7 +252,6 @@ private object YarnClusterDriver extends Logging with Matchers {
     } finally {
       sc.stop()
       Files.write(result, status, Charsets.UTF_8)
-      listener = null
     }
   }
 
