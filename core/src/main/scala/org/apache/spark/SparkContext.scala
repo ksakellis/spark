@@ -17,6 +17,8 @@
 
 package org.apache.spark
 
+import org.apache.spark.scheduler.plan.ExecutionPlanner
+
 import scala.language.implicitConversions
 
 import java.io._
@@ -1403,11 +1405,42 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
     }
     val callSite = getCallSite
     val cleanedFunc = clean(func)
-    logInfo("Starting job: " + callSite.shortForm)
-    dagScheduler.runJob(rdd, cleanedFunc, partitions, callSite, allowLocal,
-      resultHandler, localProperties.get)
-    progressBar.foreach(_.finishAll())
-    rdd.doCheckpoint()
+
+    val explainOnly = executionDisabled.getOrElse(conf.getBoolean("spark.explainOnly", false))
+    val showPlan = showExplainPlan.getOrElse(conf.getBoolean("spark.printPlan", false))
+
+    if (explainOnly || showPlan) {
+      val planner = new ExecutionPlanner(this)
+      val plan = planner.createExecutionPlan(rdd,
+        cleanedFunc, partitions, callSite, resultHandler)
+      logInfo("\n\nEXPLAIN PLAN:" + plan)
+    }
+
+    if (!explainOnly) {
+      dagScheduler.runJob(rdd, cleanedFunc, partitions, callSite, allowLocal,
+        resultHandler, localProperties.get)
+      progressBar.foreach(_.finishAll())
+      rdd.doCheckpoint()
+    }
+  }
+
+  var executionDisabled : Option[Boolean] = None
+  var showExplainPlan : Option[Boolean] = None
+
+  def disableExecution(): Unit = {
+    executionDisabled = Some(true)
+  }
+
+  def enableExecution(): Unit = {
+    executionDisabled = Some(false)
+  }
+
+  def explainOff(): Unit = {
+    showExplainPlan = Some(false)
+  }
+  
+  def explainOn(): Unit = {
+    showExplainPlan = Some(true)
   }
 
   /**

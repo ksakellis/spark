@@ -40,8 +40,8 @@ import org.apache.spark.shuffle.ShuffleWriter
  */
 private[spark] class ShuffleMapTask(
     stageId: Int,
-    taskBinary: Broadcast[Array[Byte]],
-    partition: Partition,
+    val taskBinary: Broadcast[Array[Byte]],
+    val partition: Partition,
     @transient private var locs: Seq[TaskLocation])
   extends Task[MapStatus](stageId, partition.index) with Logging {
 

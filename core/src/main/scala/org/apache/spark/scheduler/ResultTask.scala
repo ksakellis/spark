@@ -41,8 +41,8 @@ import org.apache.spark.rdd.RDD
  */
 private[spark] class ResultTask[T, U](
     stageId: Int,
-    taskBinary: Broadcast[Array[Byte]],
-    partition: Partition,
+    val taskBinary: Broadcast[Array[Byte]],
+    val partition: Partition,
     @transient locs: Seq[TaskLocation],
     val outputId: Int)
   extends Task[U](stageId, partition.index) with Serializable {

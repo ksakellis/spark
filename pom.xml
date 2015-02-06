@@ -155,6 +155,7 @@
     <jodd.version>3.6.3</jodd.version>
     <codehaus.jackson.version>1.8.8</codehaus.jackson.version>
     <snappy.version>1.1.1.6</snappy.version>
+    <ascii.graphs.version>0.0.3</ascii.graphs.version>    
 
     <!--
       Dependency scopes that can be overridden by enabling certain profiles. These profiles are
@@ -185,9 +186,9 @@
     <repository>
       <id>central</id>
       <!-- This should be at top, it makes maven try the central repo first and then others and hence faster dep resolution -->
-      <name>Maven Repository</name>
+       <name>Maven Repository</name>
       <url>https://repo1.maven.org/maven2</url>
-      <releases>
+       <releases>
         <enabled>true</enabled>
       </releases>
       <snapshots>
@@ -232,8 +233,8 @@
       <name>Cloudera Repository</name>
       <url>https://repository.cloudera.com/artifactory/cloudera-repos</url>
       <releases>
-        <enabled>true</enabled>
-      </releases>
+         <enabled>true</enabled>
+       </releases>
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
@@ -279,8 +280,8 @@
       to create effective poms on publishing (see SPARK-3812).
     -->
     <dependency>
-      <groupId>org.spark-project.spark</groupId>
-      <artifactId>unused</artifactId>
+       <groupId>org.spark-project.spark</groupId>
+       <artifactId>unused</artifactId>
       <version>1.0.0</version>
     </dependency>
     <!--
@@ -1031,6 +1032,11 @@
             <artifactId>libthrift</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>com.github.mdr</groupId>
+        <artifactId>ascii-graphs_2.10</artifactId>
+        <version>${ascii.graphs.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
